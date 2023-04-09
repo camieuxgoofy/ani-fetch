@@ -1,0 +1,1 @@
+Fetch GraphQL [AniList](https://github.com/AniList/ApiV2-GraphQL-Docs)
