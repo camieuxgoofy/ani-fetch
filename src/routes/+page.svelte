@@ -79,26 +79,24 @@
     />
     <button type="submit">Search</button>
   </form>
-  {#each aniData as anime}
-  <div>
-    <h3>{anime.title.romaji == null ? "" : anime.title.romaji}</h3>
-    <h3>{anime.title.english == null ? "" : anime.title.english}</h3>
-    <h3>{anime.title.native == null ? "" : anime.title.native}</h3>
-    <h1>
-      {anime.title.romaji == anime.title.english && anime.title.native
-        ? ""
-        : anime.title.romaji}
-    </h1>
-    <p>Episodes: {anime.episodes}</p>
-    <p>Genres: {anime.genres}</p>
-    <img use:lazyLoad={anime.coverImage.medium} alt={anime.title.romaji} />
-    <p>
-      {anime.averageScore}
-    </p>
-    <p>{anime.meanScore}</p>
-    <span>{anime.tags.name}</span>
-  </div>
-{/each}
+  {#each aniData as anime (anime.id)}
+    <div key={anime.id}>
+      <h3>{anime.title.romaji == null ? "" : anime.title.romaji}</h3>
+      <h3>{anime.title.english == null ? "" : anime.title.english}</h3>
+      <h3>{anime.title.native == null ? "" : anime.title.native}</h3>
+      <h1>
+        {anime.title.romaji == anime.title.english && anime.title.native
+          ? ""
+          : anime.title.romaji}
+      </h1>
+      <p>Episodes: {anime.episodes}</p>
+      <p>Genres: {anime.genres}</p>
+      <img use:lazyLoad={anime.coverImage.medium} alt={anime.title.romaji} />
+      <p>{anime.averageScore}</p>
+      <p>{anime.meanScore}</p>
+      <span>{anime.tags.name}</span>
+    </div>
+  {/each}
 </section>
 
 <style>
