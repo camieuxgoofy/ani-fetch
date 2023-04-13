@@ -1,13 +1,14 @@
 <script>
   import { onMount } from "svelte";
   import { lazyLoad } from "./lazyLoad";
+  import SearchBar from "./components/SearchBar.svelte";
 
   let aniData = [];
 
   const query = `
-      query ($page: Int, $score: Int) {
+      query ($page: Int, $score: Int, $genre: String, $tags: [String!]) {
         Page (page: $page, perPage: 20) {
-          media (tag_in: ["Yuri"], averageScore_greater: $score) {
+          media (tag_in: $tags, genre: $genre ,averageScore_greater: $score) {
             id,
             title {
               romaji,
@@ -29,15 +30,11 @@
         }
       }`;
 
-  let score = 0;
+  let score;
+  let genre;
+  let tags;
 
-  const variables = { page: 1, score };
-
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    variables.score = score;
-    fetchResults();
-  };
+  const variables = { page: 1, score, genre, tags };
 
   const fetchResults = async () => {
     const url = "https://graphql.anilist.co";
@@ -56,9 +53,30 @@
       const response = await fetch(url, options);
       const data = await response.json();
       aniData = data.data.Page.media;
-    } catch (err) {
-      console.error(err);
+    } catch (error) {
+      console.error("Error fetching data: ", error);
     }
+  };
+
+  const handleSearch = (event) => {
+    let newScore = event.detail.score;
+    let newGenre = event.detail.genre;
+    let newTags = event.detail.tags;
+
+    if (newScore == "") {
+      newScore = 0;
+    }
+    if (newGenre == "") {
+      newGenre = "";
+    }
+
+    score = newScore;
+    genre = newGenre;
+    tags = newTags;
+    variables.genre = genre;
+    variables.score = score;
+    variables.tags = tags;
+    fetchResults();
   };
 
   onMount(() => {
@@ -66,19 +84,15 @@
   });
 </script>
 
-<section>
-  <form on:submit={handleSubmit}>
-    <label for="score-input">Minimum score:</label>
-    <input
-      type="number"
-      id="score-input"
-      name="score"
-      bind:value={score}
-      min="0"
-      max="100"
-    />
-    <button type="submit">Search</button>
-  </form>
+<section class="h-screen">
+  <SearchBar
+    {score}
+    {genre}
+    {tags}
+    on:scoreChange={handleSearch}
+    on:genreChange={handleSearch}
+    on:tagsChange={handleSearch}
+  />
   {#each aniData as anime (anime.id)}
     <div key={anime.id}>
       <h3>{anime.title.romaji == null ? "" : anime.title.romaji}</h3>
