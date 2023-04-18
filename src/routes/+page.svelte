@@ -1,14 +1,17 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { lazyLoad } from "./lazyLoad";
   import SearchBar from "./components/SearchBar.svelte";
 
   let aniData = [];
-
   const query = `
-      query ($page: Int, $score: Int, $genre: String, $tags: [String!]) {
+      query ($search: String ,$page: Int, $score: Int, $genre: String, $tags: [String!]) {
         Page (page: $page, perPage: 20) {
-          media (tag_in: $tags, genre: $genre ,averageScore_greater: $score) {
+          pageInfo {
+            currentPage
+            lastPage
+          },
+          media (search: $search ,tag_in: $tags, genre: $genre ,averageScore_greater: $score) {
             id,
             title {
               romaji,
@@ -26,6 +29,7 @@
             tags {
               name
             },
+            format
           }
         }
       }`;
@@ -33,10 +37,17 @@
   let score;
   let genre;
   let tags;
+  let search;
+  let page = 1;
+  let totalPages = 1;
+  let loading = false;
+  let error = null;
 
-  const variables = { page: 1, score, genre, tags };
+  const variables = { page, score, genre, tags, search };
 
   const fetchResults = async () => {
+    loading = true;
+
     const url = "https://graphql.anilist.co";
     const options = {
       method: "POST",
@@ -53,69 +64,137 @@
       const response = await fetch(url, options);
       const data = await response.json();
       aniData = data.data.Page.media;
+      page = data.data.Page.pageInfo.currentPage;
+      totalPages = data.data.Page.pageInfo.lastPage;
+      console.log("total pages:", totalPages);
     } catch (error) {
       console.error("Error fetching data: ", error);
+    } finally {
+      loading = false;
     }
-  };
-
-  const handleSearch = (event) => {
-    let newScore = event.detail.score;
-    let newGenre = event.detail.genre;
-    let newTags = event.detail.tags;
-
-    if (newScore == "") {
-      newScore = 0;
-    }
-    if (newGenre == "") {
-      newGenre = "";
-    }
-
-    score = newScore;
-    genre = newGenre;
-    tags = newTags;
-    variables.genre = genre;
-    variables.score = score;
-    variables.tags = tags;
-    fetchResults();
   };
 
   onMount(() => {
     fetchResults();
   });
+
+  const nextPage = () => {
+    if (page < totalPages) {
+      variables.page = page + 1;
+      fetchResults();
+    }
+  };
+
+  const prevPage = () => {
+    if (page > 1) {
+      variables.page = page - 1;
+      fetchResults();
+    }
+  };
+
+  const handleSearch = (event) => {
+    let newSearch = event.detail.search;
+    let newScore = event.detail.score;
+    let newGenre = event.detail.genre;
+    let newTags = event.detail.tags;
+
+    if (!Number.isInteger(newScore)) {
+      newScore = 0;
+    }
+
+    if (newGenre == "") {
+      newGenre = "";
+    }
+
+    search = newSearch;
+    score = newScore;
+    genre = newGenre;
+    tags = newTags;
+    variables.search = search;
+    variables.genre = genre;
+    variables.score = score;
+    variables.tags = tags;
+    fetchResults();
+  };
 </script>
 
-<section class="h-screen">
+<section class="space-y-4">
   <SearchBar
+    {search}
     {score}
     {genre}
     {tags}
+    on:searchChange={handleSearch}
     on:scoreChange={handleSearch}
     on:genreChange={handleSearch}
     on:tagsChange={handleSearch}
   />
-  {#each aniData as anime (anime.id)}
-    <div key={anime.id}>
-      <h3>{anime.title.romaji == null ? "" : anime.title.romaji}</h3>
-      <h3>{anime.title.english == null ? "" : anime.title.english}</h3>
-      <h3>{anime.title.native == null ? "" : anime.title.native}</h3>
-      <h1>
-        {anime.title.romaji == anime.title.english && anime.title.native
-          ? ""
-          : anime.title.romaji}
-      </h1>
-      <p>Episodes: {anime.episodes}</p>
-      <p>Genres: {anime.genres}</p>
-      <img use:lazyLoad={anime.coverImage.medium} alt={anime.title.romaji} />
-      <p>{anime.averageScore}</p>
-      <p>{anime.meanScore}</p>
-      <span>{anime.tags.name}</span>
+  {#if loading}
+    <div class="h-screen w-full flex items-center justify-center">
+      <p>Loading...</p>
     </div>
-  {/each}
+  {:else if error}
+    <p>Error: {error.message}</p>
+  {:else if aniData && aniData.length > 0}
+    <div
+      class="relative grid gap-y-3 grid-cols-[repeat(auto-fill,150px)] justify-evenly
+   md:grid-cols-[repeat(auto-fill,150px)] md:min-w-0 w-full"
+    >
+      {#each aniData as anime (anime.id)}
+        <div
+          class="shadow-[0_2px_20px_rgba(49,54,68,0.2)] text-[rgb(var(--color-text-bright))] inline-block text-[1.2rem] h-50 md:text-[1.3rem] md:h-[210px] relative w-full rounded-sm overflow-hidden
+        "
+          key={anime.id}
+        >
+          <div class="relative w-full h-full">
+            <img
+              class="w-full h-full opacity-0 transition-all duration-[1s] ease-[ease]"
+              use:lazyLoad={anime.coverImage.medium}
+              alt={anime.title.romaji}
+            />
+            <div
+              class="absolute w-full text-xs p-2 bottom-0 bg-black opacity-0 hover:opacity-80 transition duration-300 break-words"
+            >
+              <h2 class="font-bold mb-2">
+                {anime.title.english ||
+                  anime.title.romaji ||
+                  anime.title.native}
+              </h2>
+              <p>
+                {anime.episodes !== null
+                  ? `Eps: ${anime.episodes}`
+                  : anime.genres}
+              </p>
+              <p>
+                {anime.averageScore !== null
+                  ? `Score: ${anime.averageScore}`
+                  : anime.format}
+              </p>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {:else}
+    <div class="h-screen w-full flex items-center justify-center">
+      <p>No data found</p>
+    </div>
+  {/if}
+  {#if totalPages > 1}
+    <div class="flex justify-center space-x-4 mt-8">
+      <button
+        class="px-3 py-1 rounded-md bg-blue-500 text-white"
+        on:click={prevPage}
+      >
+        Prev
+      </button>
+      <span>{page}/{totalPages}</span>
+      <button
+        class="px-3 py-1 rounded-md bg-blue-500 text-white"
+        on:click={nextPage}
+      >
+        Next
+      </button>
+    </div>
+  {/if}
 </section>
-
-<style>
-  img {
-    opacity: 0;
-    transition: all 1s ease;
-  }
-</style>

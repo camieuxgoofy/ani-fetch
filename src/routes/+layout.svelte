@@ -2,8 +2,8 @@
   import "../app.css";
 </script>
 
-<nav class="bg-yellow-500">
-  <a href="/">Home</a>
-  <a href="/test" data-sveltekit-prefetch>test</a>
-</nav>
-<slot />
+<div class="bg-[#091225] text-white h-full">
+  <div class="mx-auto max-w-lg p-2">
+    <slot />
+  </div>
+</div>
