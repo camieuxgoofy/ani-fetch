@@ -1,17 +1,17 @@
 <script>
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import { lazyLoad } from "./lazyLoad";
   import SearchBar from "./components/SearchBar.svelte";
 
-  let aniData = [];
+  let allData = [];
   const query = `
       query ($search: String ,$page: Int, $score: Int, $genre: String, $tags: [String!]) {
-        Page (page: $page, perPage: 20) {
+        Page (page: $page, perPage: 9) {
           pageInfo {
-            currentPage
+            currentPage,
             lastPage
           },
-          media (search: $search ,tag_in: $tags, genre: $genre ,averageScore_greater: $score) {
+          media (search: $search, tag_in: $tags, genre: $genre ,averageScore_greater: $score) {
             id,
             title {
               romaji,
@@ -39,7 +39,7 @@
   let tags;
   let search;
   let page = 1;
-  let totalPages = 1;
+  let totalPages = null;
   let loading = false;
   let error = null;
 
@@ -47,7 +47,6 @@
 
   const fetchResults = async () => {
     loading = true;
-
     const url = "https://graphql.anilist.co";
     const options = {
       method: "POST",
@@ -63,59 +62,41 @@
     try {
       const response = await fetch(url, options);
       const data = await response.json();
-      aniData = data.data.Page.media;
+      allData = data.data.Page.media;
       page = data.data.Page.pageInfo.currentPage;
       totalPages = data.data.Page.pageInfo.lastPage;
-      console.log("total pages:", totalPages);
-    } catch (error) {
-      console.error("Error fetching data: ", error);
     } finally {
       loading = false;
     }
   };
 
-  onMount(() => {
-    fetchResults();
-  });
-
-  const nextPage = () => {
-    if (page < totalPages) {
+  const nextPage = async () => {
+    if (page < totalPages && !loading) {
       variables.page = page + 1;
-      fetchResults();
+      await fetchResults();
     }
   };
 
-  const prevPage = () => {
-    if (page > 1) {
+  const prevPage = async () => {
+    if (page > 1 && !loading) {
       variables.page = page - 1;
-      fetchResults();
+      await fetchResults();
     }
   };
 
   const handleSearch = (event) => {
     let newSearch = event.detail.search;
-    let newScore = event.detail.score;
-    let newGenre = event.detail.genre;
-    let newTags = event.detail.tags;
-
-    if (!Number.isInteger(newScore)) {
-      newScore = 0;
-    }
-
-    if (newGenre == "") {
-      newGenre = "";
-    }
 
     search = newSearch;
-    score = newScore;
-    genre = newGenre;
-    tags = newTags;
+
+    variables.page = 1;
     variables.search = search;
-    variables.genre = genre;
-    variables.score = score;
-    variables.tags = tags;
     fetchResults();
   };
+
+  onMount(() => {
+    fetchResults();
+  });
 </script>
 
 <section class="space-y-4">
@@ -135,12 +116,12 @@
     </div>
   {:else if error}
     <p>Error: {error.message}</p>
-  {:else if aniData && aniData.length > 0}
+  {:else if allData && allData.length > 0}
     <div
       class="relative grid gap-y-3 grid-cols-[repeat(auto-fill,150px)] justify-evenly
    md:grid-cols-[repeat(auto-fill,150px)] md:min-w-0 w-full"
     >
-      {#each aniData as anime (anime.id)}
+      {#each allData as anime (anime.id)}
         <div
           class="shadow-[0_2px_20px_rgba(49,54,68,0.2)] text-[rgb(var(--color-text-bright))] inline-block text-[1.2rem] h-50 md:text-[1.3rem] md:h-[210px] relative w-full rounded-sm overflow-hidden
         "
